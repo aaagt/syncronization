@@ -1,3 +1,3 @@
 # name
 
-- [task1](./task1) - task1 name
+- [task1](./task1) - Робот-доставщик
