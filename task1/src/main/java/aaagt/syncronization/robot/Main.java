@@ -1,18 +1,43 @@
 package aaagt.syncronization.robot;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 
 public class Main {
 
-    public static final Map<Integer, Integer> sizeToFreq = new TreeMap<>();
+    public static final Map<Integer, Integer> sizeToFreq = Collections.synchronizedMap(new TreeMap<>());
 
     public static void main(String[] args) throws InterruptedException {
 
         // создаём и запускаем потоки
         var threads = new ArrayList<Thread>();
+
+        var loggingThread = new Thread(() -> {
+            var maxRate = 0;
+            while (!Thread.interrupted()) {
+                synchronized (sizeToFreq) {
+                    try {
+                        sizeToFreq.wait();
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    var entryWithMaxRate = sizeToFreq.entrySet().stream()
+                            .reduce((rateEntry, acc) -> {
+                                if (rateEntry.getValue() > acc.getValue()) {
+                                    return rateEntry;
+                                }
+                                return acc;
+                            })
+                            .orElseThrow();
+                    System.out.printf("Наиболее часто встречается: %d (%d раз)\n", entryWithMaxRate.getKey(), entryWithMaxRate.getValue());
+                }
+            }
+        });
+        loggingThread.start();
+
         for (int i = 0; i < 1000; i++) {
             Thread thread = new Thread(Main::run);
             threads.add(thread);
@@ -23,6 +48,7 @@ public class Main {
         for (Thread thread : threads) {
             thread.join();
         }
+        loggingThread.interrupt();
 
         // выводим результат
         var maxRate = sizeToFreq.keySet().stream()
@@ -48,6 +74,11 @@ public class Main {
             } else {
                 sizeToFreq.put(count, 1);
             }
+            sizeToFreq.notify();
+        }
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
         }
     }
 
